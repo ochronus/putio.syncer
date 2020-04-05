@@ -12,7 +12,7 @@ import (
 )
 
 func main() {
-	godotenv.Load()
+	_ = godotenv.Load()
 	token := os.Getenv("PUTIO_TOKEN")
 	if len(token) == 0 {
 		panic("PUTIO_TOKEN is empty")
