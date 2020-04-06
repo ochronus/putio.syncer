@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"time"
+	"os"
+	"strings"
 
+	"github.com/cavaliercoder/grab"
 	"github.com/manifoldco/promptui"
 	"github.com/putdotio/go-putio"
 	"github.com/sherifabdlnaby/gpool"
@@ -28,35 +30,42 @@ func walkPutIo(root putio.File, parents []string, client *putio.Client, walkFn P
 		if file.IsDir() {
 			walkPutIo(file, parents, client, walkFn, pool, resultsChan)
 		} else {
-			fmt.Printf("Processing: %s\n", file.Name)
 			walkFn(file, parents, client, pool, resultsChan)
 		}
 	}
 	return nil
 }
 
-func worker(url string) {
-	fmt.Println("downloading", url)
-	time.Sleep(3 * time.Second)
+func worker(url string, destinationDir string) {
+	mkdirErr := os.MkdirAll(destinationDir, os.ModePerm)
+	if mkdirErr != nil {
+		fmt.Printf("Error creating path: %v\n", mkdirErr)
+	}
+	fmt.Println("Downloading", url, "to", destinationDir)
+	_, err := grab.Get(destinationDir, url)
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
 func printFile(file putio.File, parents []string, client *putio.Client, pool *gpool.Pool, resultsChan chan<- string) {
+	currDir, err := os.Getwd()
+	if err != nil {
+		panic("Cannot get current directory")
+	}
+	destinationDir := fmt.Sprintf("%s/%s", currDir, strings.Join(parents, "/"))
 	downloadUrl, err := client.Files.URL(context.Background(), file.ID, true)
 	if err != nil {
 		fmt.Printf("Cannot get download url for %s\n", file.Name)
 	} else {
 		job := func() {
-			worker(downloadUrl)
-			resultsChan <- downloadUrl
+			worker(downloadUrl, destinationDir)
+			resultsChan <- file.Name
 		}
 		err := pool.Enqueue(context.Background(), job)
 		if err != nil {
 			fmt.Printf("Error queueing: %v", err)
-		} else {
-			fmt.Printf("Queued %s\n", downloadUrl)
 		}
-		//fmt.Printf("Found file %s / %s - %s\n", strings.Join(parents, " / "), file.Name, downloadUrl)
-
 	}
 }
 
