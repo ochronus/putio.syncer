@@ -4,17 +4,18 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"strings"
+	"time"
 
 	"github.com/manifoldco/promptui"
 	"github.com/putdotio/go-putio"
+	"github.com/sherifabdlnaby/gpool"
 	"github.com/spf13/viper"
 	"golang.org/x/oauth2"
 )
 
-type PutioWalkFunc func(file putio.File, parents []string, client *putio.Client)
+type PutioWalkFunc func(file putio.File, parents []string, client *putio.Client, pool *gpool.Pool, resultsChan chan<- string)
 
-func walkPutIo(root putio.File, parents []string, client *putio.Client, walkFn PutioWalkFunc) error {
+func walkPutIo(root putio.File, parents []string, client *putio.Client, walkFn PutioWalkFunc, pool *gpool.Pool, resultsChan chan<- string) error {
 	if !root.IsDir() {
 		return nil
 	}
@@ -25,20 +26,37 @@ func walkPutIo(root putio.File, parents []string, client *putio.Client, walkFn P
 	}
 	for _, file := range files {
 		if file.IsDir() {
-			walkPutIo(file, parents, client, walkFn)
+			walkPutIo(file, parents, client, walkFn, pool, resultsChan)
 		} else {
-			walkFn(file, parents, client)
+			fmt.Printf("Processing: %s\n", file.Name)
+			walkFn(file, parents, client, pool, resultsChan)
 		}
 	}
 	return nil
 }
 
-func printFile(file putio.File, parents []string, client *putio.Client) {
+func worker(url string) {
+	fmt.Println("downloading", url)
+	time.Sleep(3 * time.Second)
+}
+
+func printFile(file putio.File, parents []string, client *putio.Client, pool *gpool.Pool, resultsChan chan<- string) {
 	downloadUrl, err := client.Files.URL(context.Background(), file.ID, true)
 	if err != nil {
 		fmt.Printf("Cannot get download url for %s\n", file.Name)
 	} else {
-		fmt.Printf("Found file %s / %s - %s\n", strings.Join(parents, " / "), file.Name, downloadUrl)
+		job := func() {
+			worker(downloadUrl)
+			resultsChan <- downloadUrl
+		}
+		err := pool.Enqueue(context.Background(), job)
+		if err != nil {
+			fmt.Printf("Error queueing: %v", err)
+		} else {
+			fmt.Printf("Queued %s\n", downloadUrl)
+		}
+		//fmt.Printf("Found file %s / %s - %s\n", strings.Join(parents, " / "), file.Name, downloadUrl)
+
 	}
 }
 
@@ -109,7 +127,16 @@ func main() {
 			}
 		}
 	}
+	pool := gpool.NewPool(2)
+	defer pool.Stop()
+	resultsChan := make(chan string)
+	go func() {
+		for url := range resultsChan {
+			fmt.Println(url)
+		}
+	}()
 	root, _ := client.Files.Get(context.TODO(), remoteFolderId)
 	var parents []string
-	walkPutIo(root, parents, client, printFile)
+	walkPutIo(root, parents, client, printFile, pool, resultsChan)
+
 }
