@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"os"
 	"strings"
 
 	"github.com/putdotio/go-putio"
@@ -33,7 +32,7 @@ func GetPutioClient(token string) *putio.Client {
 	return putio.NewClient(oauthClient)
 }
 
-func TraversePutioFolder(root putio.File, parents []string, client *putio.Client, pool *gpool.Pool, resultsChan chan<- string) error {
+func TraversePutioFolder(root putio.File, parents []string, client *putio.Client, pool *gpool.Pool, resultsChan chan<- string, localFolder string) error {
 	if !root.IsDir() {
 		return nil
 	}
@@ -44,21 +43,17 @@ func TraversePutioFolder(root putio.File, parents []string, client *putio.Client
 	}
 	for _, file := range files {
 		if file.IsDir() {
-			TraversePutioFolder(file, parents, client, pool, resultsChan)
+			TraversePutioFolder(file, parents, client, pool, resultsChan, localFolder)
 		} else {
-			processFile(file, parents, client, pool, resultsChan)
+			processFile(file, parents, client, pool, resultsChan, localFolder)
 		}
 	}
 	return nil
 }
 
-func processFile(file putio.File, parents []string, client *putio.Client, pool *gpool.Pool, resultsChan chan<- string) {
-	currDir, err := os.Getwd()
-	if err != nil {
-		log.Fatal("Cannot get current directory")
-	}
+func processFile(file putio.File, parents []string, client *putio.Client, pool *gpool.Pool, resultsChan chan<- string, localFolder string) {
 	// TODO: make path handling OS independent
-	destinationDir := fmt.Sprintf("%s/%s", currDir, strings.Join(parents, "/"))
+	destinationDir := fmt.Sprintf("%s/%s", localFolder, strings.Join(parents, "/"))
 	downloadUrl, err := client.Files.URL(context.Background(), file.ID, true)
 	if err != nil {
 		fmt.Printf("Cannot get download url for %s\n", file.Name)

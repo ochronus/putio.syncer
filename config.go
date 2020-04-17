@@ -52,6 +52,24 @@ func getTokenFromUser() string {
 	return result
 }
 
+func getLocalPathFromUser() string {
+	tokenPrompt := promptui.Prompt{
+		Label: "Please enter your local path",
+	}
+
+	result, err := tokenPrompt.Run()
+
+	if err != nil {
+		log.Fatal("Prompt failed", err)
+	}
+	viper.Set("LOCAL_DOWNLOAD_PATH", result)
+	err = viper.WriteConfig()
+	if err != nil {
+		log.Fatal("Error saving config", err)
+	}
+	return result
+}
+
 func getRemoteFolderFromUser(client *putio.Client) (remoteFolderId int64) {
 	files, directories, err := ListToplevelFolders(client)
 	if err != nil {
@@ -82,7 +100,7 @@ func getRemoteFolderFromUser(client *putio.Client) (remoteFolderId int64) {
 	return remoteFolderId
 }
 
-func Setup() (client *putio.Client, remoteFolderId int64) {
+func Setup() (client *putio.Client, remoteFolderId int64, localFolder string) {
 	configLoadErr := loadConfig()
 	if configLoadErr != nil {
 		log.Fatal("Cannot load config")
@@ -91,6 +109,10 @@ func Setup() (client *putio.Client, remoteFolderId int64) {
 	if token == "" {
 		token = getTokenFromUser()
 	}
+	localFolder = viper.GetString("LOCAL_DOWNLOAD_PATH")
+	if localFolder == "" {
+		localFolder = getLocalPathFromUser()
+	}
 
 	client = GetPutioClient(token)
 
@@ -98,5 +120,5 @@ func Setup() (client *putio.Client, remoteFolderId int64) {
 	if remoteFolderId == 0 {
 		remoteFolderId = getRemoteFolderFromUser(client)
 	}
-	return client, remoteFolderId
+	return client, remoteFolderId, localFolder
 }

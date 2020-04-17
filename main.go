@@ -8,7 +8,7 @@ import (
 )
 
 func main() {
-	client, remoteFolderId := Setup()
+	client, remoteFolderId, localFolder := Setup()
 	pool := gpool.NewPool(DOWNLOAD_CONCURRENCY)
 	defer pool.Stop()
 	resultsChan := make(chan string)
@@ -19,6 +19,6 @@ func main() {
 	}()
 	root, _ := client.Files.Get(context.Background(), remoteFolderId)
 	var parents []string
-	TraversePutioFolder(root, parents, client, pool, resultsChan)
+	TraversePutioFolder(root, parents, client, pool, resultsChan, localFolder)
 
 }
