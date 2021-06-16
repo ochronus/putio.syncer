@@ -6,7 +6,7 @@ require (
 	github.com/cavaliercoder/grab v2.0.0+incompatible
 	github.com/joho/godotenv v1.3.0
 	github.com/manifoldco/promptui v0.7.0
-	github.com/putdotio/go-putio v1.3.2
+	github.com/putdotio/go-putio v1.6.0
 	github.com/sherifabdlnaby/gpool v1.1.0
 	github.com/spf13/viper v1.8.0
 	golang.org/x/oauth2 v0.0.0-20210402161424-2e8d93401602
